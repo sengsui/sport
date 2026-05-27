@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบบริหารและรายงานผลกีฬาสีภายใน</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1565C0;
+      --primary-dark: #0d47a1;
+      --gold: #FFD700;
+      --silver: #C0C0C0;
+      --bronze: #CD7F32;
+      --radius: 10px;
+      --bg: #F4F6F9;
+      --surface: #FFFFFF;
+      --text: #333333;
+      --border: #E0E0E0;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Sarabun', sans-serif; }
+    body { background: var(--bg); color: var(--text); }
+    
+    /* Layout Framework & Menu UI */
+    nav { background: var(--primary); color: #FFF; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; sticky; top: 0; z-index: 100; }
+    .brand { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+    .nav-links { display: flex; gap: 1.2rem; list-style: none; align-items: center; }
+    .nav-links a { color: rgba(255,255,255,0.85); text-decoration: none; font-weight: 500; cursor: pointer; transition: 0.2s; }
+    .nav-links a:hover, .nav-links a.active { color: #FFF; text-decoration: underline; }
+    .burger { display: none; font-size: 1.5rem; cursor: pointer; }
+
+    main { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; min-height: 75vh; }
+    .page { display: none; }
+    .page.active { display: block; animation: viewAnime 0.3s ease; }
+
+    /* Reusable UI Components */
+    .card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 1.5rem; border: 1px solid var(--border); }
+    .grid-4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+    
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; text-align: left; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); }
+    th { background: #ECEFF1; font-weight: 700; }
+    tr:hover { background: #F5F7F8; }
+    
+    .badge { padding: 0.25rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; display: inline-block; }
+    .badge-wait { background: #CFD8DC; color: #37474F; }
+    .badge-live { background: #FFCDD2; color: #C62828; animation: pulse 1s infinite alternate; }
+    .badge-done { background: #C8E6C9; color: #2E7D32; }
+
+    /* Controls Elements */
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; font-weight: 500; }
+    .form-control { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; }
+    .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-size: 0.95rem; font-weight: 500; cursor: pointer; text-decoration: none; transition: 0.2s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-success { background: #2E7D32; color: #fff; }
+    .btn-danger { background: #C62828; color: #fff; }
+
+    /* Custom Toast & Overlay Screen System */
+    #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.75); display: none; justify-content: center; align-items: center; z-index: 9999; }
+    .spin { width: 45px; height: 45px; border: 4px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spinRotate 0.8s linear infinite; }
+    #toast { position: fixed; bottom: 25px; right: 25px; background: #263238; color: #fff; padding: 1rem 1.5rem; border-radius: 6px; display: none; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+    /* Graphic Dynamic Elements Hero Banner */
+    .hero { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; padding: 2.5rem; border-radius: var(--radius); text-align: center; margin-bottom: 1.5rem; }
+    .countdown { display: flex; justify-content: center; gap: 1rem; margin-top: 1rem; font-size: 1.8rem; font-weight: 700; }
+
+    /* Custom Modals Elements overlay Layer */
+    .modal-backdrop { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; z-index:2000; }
+    .modal-box { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+
+    /* Printing Configuration Layer A4 Stylesheets */
+    .cert-sheet { width: 297mm; height: 210mm; padding: 25mm; background: #fff; border: 12px double var(--primary); margin: 0 auto 2rem auto; display: flex; flex-direction: column; justify-content: space-between; align-items: center; text-align: center; box-sizing: border-box; }
+    
+    @keyframes viewAnime { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spinRotate { to { transform: rotate(360deg); } }
+    @keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+
+    @media (max-width: 768px) {
+      .nav-links { display: none; flex-direction: column; width: 100%; position: absolute; top: 58px; left: 0; background: var(--primary); padding: 1rem; gap: 1rem; }
+      .nav-links.open { display: flex; }
+      .burger { display: block; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      nav, button, .btn, .no-print, #toast, #loading { display: none !important; }
+      body, main { background: #fff; margin: 0; padding: 0; }
+      .page { display: none !important; }
+      #admin-certificate { display: block !important; }
+      .cert-sheet { page-break-after: always; width: 100%; height: 100%; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="brand" onclick="app.router.navigate('home')">
+      <i class="fa-solid fa-flag-checkered"></i> <span id="app-school-title">โรงเรียน</span>
+    </div>
+    <div class="burger" onclick="document.querySelector('.nav-links').classList.toggle('open')">
+      <i class="fa-solid fa-bars"></i>
+    </div>
+    <ul class="nav-links">
+      <li><a onclick="app.router.navigate('home')" id="nav-home">หน้าหลัก</a></li>
+      <li><a onclick="app.router.navigate('schedule')" id="nav-schedule">ตารางแข่ง</a></li>
+      <li><a onclick="app.router.navigate('sports')" id="nav-sports">ประเภทกีฬา</a></li>
+      <li><a onclick="app.router.navigate('scoreboard')" id="nav-scoreboard">ตารางคะแนน</a></li>
+      <li><a onclick="app.router.navigate('login')" id="nav-login">ผู้ดูแลระบบ</a></li>
+      <li class="admin-ui" style="display:none;"><a onclick="app.router.navigate('admin')" id="nav-admin"><b>⚙️ แผงควบคุม</b></a></li>
+      <li class="admin-ui" style="display:none;"><a onclick="app.auth.logout()">ออกจากระบบ</a></li>
+    </ul>
+  </nav>
+
+  <div id="loading"><div class="spin"></div></div>
+  <div id="toast"></div>
+
+  <main id="app">
+
+    <div id="home" class="page">
+      <div class="hero">
+        <h1 id="hero-event-name">งานแข่งขันกีฬาสี</h1>
+        <div class="countdown" id="countdown-clock">กำลังคำนวณเวลานับถอยหลัง...</div>
+      </div>
+      <h2 style="margin-bottom:1rem;"><i class="fa-solid fa-trophy"></i> ตารางผู้นำคะแนนรวมคณะสี</h2>
+      <div class="grid-4" id="home-cards"></div>
+      <div class="grid-2">
+        <div class="card">
+          <h3><i class="fa-solid fa-clock-history"></i> รายการแข่งขันอัปเดตวันนี้</h3>
+          <div id="home-today-list" style="margin-top:1rem;">ไม่มีการแข่งขันวันนี้</div>
+        </div>
+        <div class="card">
+          <h3><i class="fa-solid fa-medal"></i> ผลการประกวด/ตัดสินล่าสุด 5 รายการ</h3>
+          <div id="home-recent-results" style="margin-top:1rem;">ไม่มีผลอัปเดตล่าสุด</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="schedule" class="page">
+      <div class="card">
+        <h3>ค้นหาตารางงานจัดการแข่งขัน</h3>
+        <div class="grid-4" style="margin-top:1rem;">
+          <input type="date" id="sch-filter-date" class="form-control" onchange="app.pages.schedule.filter()">
+          <select id="sch-filter-sport" class="form-control" onchange="app.pages.schedule.filter()"><option value="">ทุกประเภทกีฬา</option></select>
+          <select id="sch-filter-status" class="form-control" onchange="app.pages.schedule.filter()">
+            <option value="">ทุกสถานะ</option>
+            <option value="รอ">รอการแข่งขัน</option>
+            <option value="กำลังแข่ง">กำลังแข่งขัน</option>
+            <option value="จบ">จบการแข่งขัน</option>
+          </select>
+        </div>
+        <table id="table-schedule-view">
+          <thead><tr><th>วันเวลา</th><th>ประเภทกิจกรรมกีฬา</th><th>สถานที่จัดแข่ง</th><th>สถานะดำเนินงาน</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sports" class="page">
+      <h2 style="margin-bottom:1.5rem;"><i class="fa-solid fa-dumbbell"></i> รายการและชนิดประเภทกีฬาทั้งหมด</h2>
+      <div class="grid-4" id="sports-container-cards"></div>
+    </div>
+
+    <div id="scoreboard" class="page">
+      <div class="grid-2">
+        <div class="card">
+          <h3>สรุปสถิติจำนวนเหรียญรวม</h3>
+          <table id="table-scoreboard-view">
+            <thead><tr><th>อันดับคณะสี</th><th>🥇 ทอง</th><th>🥈 เงิน</th><th>🥉 ทองแดง</th><th>รวมคะแนน</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h3>แผนภูมิเปรียบเทียบคะแนนรวมแต่ละคณะ</h3>
+          <canvas id="chart-canvas" style="width:100%; height:260px;"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div id="login" class="page">
+      <div class="card" style="max-width:420px; margin:4rem auto;">
+        <h3 style="text-align:center; margin-bottom:1rem;"><i class="fa-solid fa-user-shield"></i> เข้าสู่ระบบจัดการข้อมูล</h3>
+        <form id="form-login">
+          <div class="form-group">
+            <label>ชื่อบัญชีผู้ใช้งาน (Username)</label>
+            <input type="text" id="login-user" class="form-control" required placeholder="ระบุชื่อบัญชี">
+          </div>
+          <div class="form-group">
+            <label>รหัสผ่านเข้าใช้ระบบ (Password)</label>
+            <input type="password" id="login-pass" class="form-control" required placeholder="ระบุรหัสผ่าน">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:1rem;">ยืนยันสิทธิ์เข้าใช้ระบบ</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="admin" class="page">
+      <h2>⚙️ ระบบหลังบ้านจัดการข้อมูลผลการแข่งขัน</h2>
+      <p style="color:var(--text-muted); margin-bottom:1.5rem;">ยินดีต้อนรับคุณผู้ดูแลระบบ | เลือกทำรายการด่วนด้านล่างนี้</p>
+      <div class="grid-4">
+        <div class="card" style="border-top:4px solid var(--primary);">
+          <h4>ควบคุมตารางงานแข่ง</h4>
+          <button class="btn btn-primary" onclick="app.router.navigate('admin-schedule')" style="margin-top:0.8rem; width:100%;">เปิดหน้าจัดการ</button>
+        </div>
+        <div class="card" style="border-top:4px solid #2E7D32;">
+          <h4>บันทึกและส่งผลการแข่ง</h4>
+          <button class="btn btn-success" onclick="app.router.navigate('admin-results')" style="margin-top:0.8rem; width:100%;">เปิดหน้าลงผล</button>
+        </div>
+        <div class="card" style="border-top:4px solid #EF6C00;">
+          <h4>นำเข้าบัญชีรายชื่อนักกีฬา</h4>
+          <button class="btn btn-primary" onclick="app.router.navigate('admin-import')" style="margin-top:0.8rem; width:100%;">เปิดหน้านำเข้า Excel</button>
+        </div>
+        <div class="card" style="border-top:4px solid #455A64;">
+          <h4>ดาวน์โหลดรายงาน & พิมพ์</h4>
+          <button class="btn btn-primary" onclick="app.router.navigate('admin-download')" style="margin-top:0.8rem; width:100%;">เปิดหน้าพิมพ์ใบงาน</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-sports" class="page">
+      <div class="card">
+        <div style="display:flex; justify-content:between; align-items:center; width:100%;">
+          <h3>แผงปรับแต่งประเภทหมวดหมู่กีฬา</h3>
+        </div>
+        <p style="margin-top:1rem; color:var(--text-muted);">สามารถจัดการและบริหารข้อมูลชนิดกีฬาผ่านโครงสร้าง API เชิงรุก</p>
+      </div>
+    </div>
+
+    <div id="admin-teams" class="page">
+      <div class="card">
+        <h3>การจัดการรายละเอียดกลุ่มทีมคณะสี</h3>
+        <p style="color:var(--text-muted);">ดึงข้อมูลการตกแต่งและวิเคราะห์คู่สีหลัก Dynamic CSS จากตารางระบบหลัก</p>
+      </div>
+    </div>
+
+    <div id="admin-results" class="page">
+      <div class="card" style="max-width:650px; margin:0 auto;">
+        <h3><i class="fa-solid fa-feather-pointed"></i> ฟอร์มลงบันทึกแต้มและมอบเหรียญรางวัล</h3>
+        <form id="form-submit-result" style="margin-top:1.5rem;">
+          <div class="form-group">
+            <label>1. เลือกรอบการจับคู่แข่งขันในตาราง</label>
+            <select id="res-select-match" class="form-control" required onchange="app.pages.adminResults.loadTeamsOptions()"></select>
+          </div>
+          <div class="form-group">
+            <label>🥇 อันดับที่ 1 (เหรียญทอง)</label>
+            <select id="res-gold" class="form-control" required></select>
+          </div>
+          <div class="form-group">
+            <label>🥈 อันดับที่ 2 (เหรียญเงิน)</label>
+            <select id="res-silver" class="form-control" required></select>
+          </div>
+          <div class="form-group">
+            <label>🥉 อันดับที่ 3 (เหรียญทองแดง)</label>
+            <select id="res-bronze" class="form-control" required></select>
+          </div>
+          <div class="form-group">
+            <label>สถิติประกอบผลการแข่ง (เช่นเวลาหรือคะแนนเสริม)</label>
+            <input type="text" id="res-meta-score" class="form-control" placeholder="ตัวอย่าง 10.24 วินาที หรือ 3-1 เซต">
+          </div>
+          <button type="submit" class="btn btn-success" style="width:100%; justify-content:center; margin-top:1rem;">ส่งบันทึกและปิดแมตช์การแข่งขันเป็นจบสิ้น</button>
+        </form>
+      </div>
+    </div>
+
+    <div id="admin-schedule" class="page">
+      <div class="card">
+        <h3>ตารางการจัดการรอบแมตช์งานแข่งขันรวม</h3>
+        <table id="table-admin-sch">
+          <thead><tr><th>วันเวลา</th><th>รหัสกิจกรรม</th><th>สถานที่แข่งขัน</th><th>เปลี่ยนสถานะการแข่งขันด่วน</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="admin-import" class="page">
+      <div class="card">
+        <h3><i class="fa-solid fa-file-excel"></i> อัปโหลดและนำเข้ารายชื่อนักกีฬาด้วย Excel</h3>
+        <p style="color:var(--text-muted); margin-bottom:1rem;">ระบบจะแมปหัวแถวดังนี้: เลขประจำตัว | ชื่อ | นามสกุล | ชั้นห้อง | id_คณะสี | id_กีฬา</p>
+        <button class="btn btn-primary" onclick="app.pages.adminImport.getTemplate()"><i class="fa-solid fa-download"></i> ดาวน์โหลดไฟล์ต้นแบบ Template</button>
+        
+        <div style="margin:2rem 0; border:3px dashed var(--border); padding:2.5rem; text-align:center; border-radius:var(--radius)">
+          <input type="file" id="excel-uploader" accept=".xlsx, .xls" style="margin-bottom:1rem;">
+          <br>
+          <button class="btn btn-success" onclick="app.pages.adminImport.parseFile()"><i class="fa-solid fa-magnifying-glass-chart"></i> วิเคราะห์ไฟล์และตรวจสอบความถูกต้อง</button>
+        </div>
+
+        <div id="import-preview" style="display:none;">
+          <h4 style="margin-bottom:0.5rem;">พรีวิวตัวอย่างข้อมูลนักกีฬา 5 แถวแรก</h4>
+          <table id="table-import-preview"><thead><tr><th>ชื่อ</th><th>นามสกุล</th><th>ไอดีคณะสี</th></tr></thead><tbody></tbody></table>
+          <button class="btn btn-danger" onclick="app.pages.adminImport.upload()">ยืนยันอัปโหลดบันทึกลงคลาวด์ชีต</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-download" class="page">
+      <div class="card">
+        <h3>ศูนย์จัดการพิมพ์เอกสารรายงานภาพรวม</h3>
+        <div class="grid-4" style="margin-top:1.5rem;">
+          <button class="btn btn-primary" onclick="app.pages.adminDownload.dlMedals()"><i class="fa-solid fa-file-csv"></i> ออกรายงานเหรียญรวม (.xlsx)</button>
+          <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-file-pdf"></i> พิมพ์หน้าตารางจัดการแข่งขัน (PDF)</button>
+          <button class="btn btn-success" onclick="app.router.navigate('admin-certificate')"><i class="fa-solid fa-award"></i> ออกใบเกียรติบัตรอิเล็กทรอนิกส์</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="admin-certificate" class="page">
+      <div class="card no-print">
+        <h3>เลือกพิมพ์เกียรติบัตรแยกประเภทกิจกรรม</h3>
+        <select id="cert-match-picker" class="form-control" style="margin:1rem 0;" onchange="app.pages.adminCertificate.draw(this.value)"></select>
+        <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-print"></i> เริ่มพิมพ์ใบประกาศเกียรติคุณทั้งหมด</button>
+      </div>
+      <div id="cert-printout-wrapper"></div>
+    </div>
+
+  </main>
+
+  <div class="modal-backdrop" id="custom-modal" onclick="this.style.display='none'">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <h3 id="modal-title">รายละเอียดข้อมูล</h3>
+      <div id="modal-body" style="margin-top:1rem;"></div>
+      <button class="btn btn-danger" style="margin-top:1.5rem; float:right;" onclick="document.getElementById('custom-modal').style.display='none'">ปิดหน้าต่าง</button>
+    </div>
+  </div>
+
+  <script>
+    // ตั้งค่าพารามิเตอร์เชิงคอนฟิกูเรชันกลางของโครงงาน
+    const CONFIG = {
+      API_URL: "https://script.google.com/macros/s/AKfycbxrqM-Z-rpEywzajkQ-LphBaoS8pkYAWkAWlLEM1Nae6Vlv4bWbjRLkxZ5CnSNpR_T-Qg/exec", // 🔴 วาง Web App URL ที่คุณ Copy มาจากขั้นตอนทำ Deployment ในช่องนี้ครับ
+      SCHOOL_NAME: "โรงเรียนองค์การบริหารส่วนจังหวัดสุราษฎร์ธานี ๑ (ดอนสักผดุงวิทย์)",
+      EVENT_NAME: "มหกรรมกีฬาสีและกรีฑาภายใน ราชพฤกษ์เกมส์ ประจำปี 2569",
+      EVENT_DATE: "2026-12-18", 
+      MEDAL_SCORE: { gold: 3, silver: 2, bronze: 1 }
+    };
+
+    // ตัวแปรเก็บแคชสถานะของโมเดลอ็อบเจกต์ภายในแอป
+    let db = { teams: [], sports: [], schedule: [], medalSummary: [] };
+
+    const app = {
+      // ตัวขับเคลื่อนการรับส่งช่องทางเครือข่าย REST API Ajax Fetcher
+      api: {
+        async get(action, params = {}) {
+          app.ui.loading(true);
+          try {
+            let url = new URL(CONFIG.API_URL);
+            url.searchParams.append("action", action);
+            for (let key in params) url.searchParams.append(key, params[key]);
+            let res = await fetch(url);
+            let json = await res.json();
+            if(!json.success) throw new Error(json.message);
+            return json;
+          } catch(e) {
+            app.ui.toast("การดึงข้อมูลล้มเหลว: " + e.message);
+            return { success: false, data: [] };
+          } finally { app.ui.loading(false); }
+        },
+        async post(action, data) {
+          app.ui.loading(true);
+          try {
+            let token = sessionStorage.getItem("admin_token");
+            let res = await fetch(CONFIG.API_URL, {
+              method: "POST",
+              body: JSON.stringify({ action, token, data })
+            });
+            let json = await res.json();
+            if(!json.success) throw new Error(json.message);
+            return json;
+          } catch(e) {
+            app.ui.toast("ส่งข้อมูลไม่สำเร็จ: " + e.message);
+            return { success: false };
+          } finally { app.ui.loading(false); }
+        }
+      },
+
+      // ระบบ SPA Client Side Routing Engine
+      router: {
+        navigate(viewId) {
+          if(viewId.startsWith('admin') && !app.auth.check()) {
+            app.ui.toast("กรุณาเข้าสู่ระบบเนื่องจากสิทธิ์ของคุณไม่เพียงพอ");
+            viewId = 'login';
+          }
+          document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+          document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+
+          let element = document.getElementById(viewId);
+          if(element) {
+            element.classList.add('active');
+            let navItem = document.getElementById('nav-' + viewId);
+            if(navItem) navItem.classList.add('active');
+            app.pages[viewId.replace(/-([a-z])/g, m => m[1].toUpperCase())]?.init();
+          }
+          document.querySelector('.nav-links').classList.remove('open');
+          window.scrollTo(0,0);
+        }
+      },
+
+      // ระบบจัดการยูสเซอร์อินเทอร์เฟสเสริม UI Tools
+      ui: {
+        loading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; },
+        toast(msg) {
+          let box = document.getElementById('toast');
+          box.innerText = msg; box.style.display = 'block';
+          setTimeout(() => box.style.display = 'none', 3000);
+        }
+      },
+
+      // ควบคุมสถานะความปลอดภัยและการตรวจสิทธิ์ยืนยันตัวตน
+      auth: {
+        check() { return !!sessionStorage.getItem("admin_token"); },
+        async hash(pwd) {
+          let buffer = new TextEncoder().encode(pwd);
+          let hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+          return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+        },
+        toggleNav() {
+          let showAdmin = this.check() ? 'block' : 'none';
+          document.querySelectorAll('.admin-ui').forEach(el => el.style.display = showAdmin);
+          document.getElementById('nav-login').style.display = this.check() ? 'none' : 'block';
+        },
+        logout() {
+          sessionStorage.clear(); this.toggleNav(); app.ui.toast("ล็อกเอาต์ออกจากเซสชันเรียบร้อย"); app.router.navigate('home');
+        }
+      },
+
+      // แผงชุดฟังก์ชันพรีเซนเทชันและตรรกะย่อยรายหน้าจอ (Controllers Domain Area)
+      pages: {
+        globalLoad: async function() {
+          document.getElementById('app-school-title').innerText = CONFIG.SCHOOL_NAME;
+          let rTeam = await app.api.get("getTeams");
+          db.teams = rTeam.data;
+          let rSport = await app.api.get("getSports");
+          db.sports = rSport.data;
+        },
+        home: {
+          async init() {
+            document.getElementById('hero-event-name').innerText = CONFIG.EVENT_NAME;
+            this.countdown();
+            let res = await app.api.get("getDashboard");
+            if(res.success) this.render(res.data);
+          },
+          countdown() {
+            clearInterval(this.timer);
+            let target = new Date(CONFIG.EVENT_DATE).getTime();
+            this.timer = setInterval(() => {
+              let diff = target - new Date().getTime();
+              if(diff < 0) { document.getElementById('countdown-clock').innerText = "การแข่งขันเริ่มต้นอย่างเป็นทางการ!"; return clearInterval(this.timer); }
+              let d = Math.floor(diff / 86400000), h = Math.floor((diff%86400000)/3600000), m = Math.floor((diff%3600000)/60000), s = Math.floor((diff%60000)/1000);
+              document.getElementById('countdown-clock').innerText = `${d} วัน ${h} ชั่วโมง ${m} นาที ${s} วินาที`;
+            }, 1000);
+          },
+          render(data) {
+            let container = document.getElementById('home-cards');
+            container.innerHTML = data.medalSummary.map(t => `
+              <div class="card" style="border-top:6px solid ${t.color || 'var(--primary)'};">
+                <h3>${t.name}</h3>
+                <div style="margin-top:0.5rem; font-weight:700;">
+                  <span style="color:var(--gold)">🥇 ${t.gold}</span> | 
+                  <span style="color:var(--silver)">🥈 ${t.silver}</span> | 
+                  <span style="color:var(--bronze)">🥉 ${t.bronze}</span>
+                </div>
+                <div style="text-align:right; font-size:1.1rem; font-weight:700; margin-top:0.5rem;">คะแนน: ${t.score}</div>
+              </div>
+            `).join('');
+            
+            document.getElementById('home-recent-results').innerHTML = data.latestResults.length ? data.latestResults.map(r => `
+              <div style="padding:0.4rem; border-bottom:1px solid var(--border)">
+                แมตช์ ID ${r.id_ตาราง}: อันดับ ${r.อันดับ} คือกลุ่มคณะสี ID ${r.id_คณะสี} (${r.ประเภทเหรียญ})
+              </div>
+            `).join('') : 'ไม่มีข้อมูลอัปเดตผล';
+          }
+        },
+        schedule: {
+          async init() {
+            let res = await app.api.get("getSchedule");
+            db.schedule = res.data;
+            document.getElementById('sch-filter-sport').innerHTML = '<option value="">ทุกประเภทกีฬา</option>' + db.sports.map(s => `<option value="${s.id}">${s.ชื่อกีฬา}</option>`).join('');
+            this.filter();
+          },
+          filter() {
+            let dVal = document.getElementById('sch-filter-date').value;
+            let sVal = document.getElementById('sch-filter-sport').value;
+            let stVal = document.getElementById('sch-filter-status').value;
+            
+            let filtered = db.schedule;
+            if(dVal) filtered = filtered.filter(x => x.วันที่.includes(dVal));
+            if(sVal) filtered = filtered.filter(x => String(x.id_กีฬา) === String(sVal));
+            if(stVal) filtered = filtered.filter(x => x.สถานะ === stVal);
+
+            document.querySelector('#table-schedule-view tbody').innerHTML = filtered.map(x => `
+              <tr>
+                <td>${x.วันที่}<br><small>${x.เวลาเริ่ม} - ${x.เวลาสิ้นสุด}</small></td>
+                <td><b>กีฬา ID ${x.id_กีฬา}</b></td>
+                <td>${x.สถานที่}</td>
+                <td><span class="badge ${x.สถานะ==='กำลังแข่ง'?'badge-live':'badge-wait'}">${x.สถานะ||'รอ'}</span></td>
+              </tr>
+            `).join('');
+          }
+        },
+        sports: {
+          init() {
+            document.getElementById('sports-container-cards').innerHTML = db.sports.map(s => `
+              <div class="card" style="text-align:center;">
+                <i class="fa-solid fa-medal" style="font-size:2.5rem; color:var(--primary)"></i>
+                <h4 style="margin-top:0.5rem;">${s.ชื่อกีฬา}</h4>
+                <p style="color:var(--text-muted); font-size:0.85rem;">ระดับชั้น: ${s.ช่วงชั้น}</p>
+              </div>
+            `).join('');
+          }
+        },
+        scoreboard: {
+          async init() {
+            let res = await app.api.get("getMedalSummary");
+            db.medalSummary = res.data;
+            document.querySelector('#table-scoreboard-view tbody').innerHTML = db.medalSummary.map(t => `
+              <tr>
+                <td><b>${t.name}</b></td>
+                <td>${t.gold}</td><td>${t.silver}</td><td>${t.bronze}</td>
+                <td><b>${t.score}</b></td>
+              </tr>
+            `).join('');
+            this.drawChart();
+          },
+          drawChart() {
+            let ctx = document.getElementById('chart-canvas').getContext('2d');
+            if(window.sysChart) window.sysChart.destroy();
+            window.sysChart = new Chart(ctx, {
+              type: 'bar',
+              data: {
+                labels: db.medalSummary.map(x => x.name),
+                datasets: [{ label: 'คะแนนรวม', data: db.medalSummary.map(x => x.score), backgroundColor: db.medalSummary.map(x => x.color || '#1565C0') }]
+              },
+              options: { responsive: true }
+            });
+          }
+        },
+        login: {
+          init() {
+            document.getElementById('form-login').onsubmit = async (e) => {
+              e.preventDefault();
+              let u = document.getElementById('login-user').value;
+              let p = document.getElementById('login-pass').value;
+              let hashed = await app.auth.hash(p);
+              
+              let res = await app.api.post("login", { username: u, password_hash: hashed });
+              if(res.success) {
+                sessionStorage.setItem("admin_token", res.token);
+                sessionStorage.setItem("admin_user", res.name);
+                app.auth.toggleNav();
+                app.ui.toast("ยืนยันสิทธิ์เข้าระบบสำเร็จ ยินดีต้อนรับคุณ " + res.name);
+                app.router.navigate('admin');
+              } else {
+                app.ui.toast("ชื่อผู้ใช้งานหรือรหัสผ่านผิดพลาด!");
+              }
+            };
+          }
+        },
+        admin: { init() {} },
+        adminSchedule: {
+          async init() {
+            let res = await app.api.get("getSchedule");
+            document.querySelector('#table-admin-sch tbody').innerHTML = res.data.map(s => `
+              <tr>
+                <td>${s.วันที่}<br><small>${s.เวลาเริ่ม}</small></td>
+                <td>ไอดีกีฬา: ${s.id_กีฬา}</td>
+                <td>${s.สถานที่}</td>
+                <td>
+                  <select class="form-control" onchange="app.pages.adminSchedule.update(${s.id}, this.value)">
+                    <option value="รอ" ${s.สถานะ==='รอ'?'selected':''}>รอการแข่งขัน</option>
+                    <option value="กำลังแข่ง" ${s.status==='กำลังแข่ง'||s.สถานะ==='กำลังแข่ง'?'selected':''}>กำลังแข่งขัน</option>
+                    <option value="จบ" ${s.สถานะ==='จบ'?'selected':''}>จบสิ้นการแข่ง</option>
+                  </select>
+                </td>
+              </tr>
+            `).join('');
+          },
+          async update(id, status) {
+            let res = await app.api.post("updateScheduleStatus", { id, status });
+            if(res.success) app.ui.toast("อัปเดตสถานะความคืบหน้ากิจกรรมสำเร็จ");
+          }
+        },
+        adminResults: {
+          async init() {
+            let res = await app.api.get("getSchedule");
+            document.getElementById('res-select-match').innerHTML = '<option value="">-- ระบุแมตช์การแข่งขัน --</option>' + res.data.map(m => `<option value="${m.id}">แมตช์ ID: ${m.id} ณ ${m.สถานที่}</option>`).join('');
+            
+            document.getElementById('form-submit-result').onsubmit = async (e) => {
+              e.preventDefault();
+              let matchId = document.getElementById('res-select-match').value;
+              
+              let pack = {
+                id_ตาราง: matchId,
+                id_คณะสี: document.getElementById('res-gold').value, // ยื่นเหรียญให้คณะสีที่จัดเลือกตามอันดับหลัก
+                ประเภทเหรียญ: "ทอง",
+                อันดับ: 1,
+                ค่า: document.getElementById('res-meta-score').value
+              };
+              
+              let resSend = await app.api.post("addResult", pack);
+              if(resSend.success) {
+                await app.api.post("updateScheduleStatus", { id: matchId, status: "จบ" });
+                app.ui.toast("บันทึกปิดรอบตัดสินรางวัลเรียบร้อย");
+                app.router.navigate('admin');
+              }
+            };
+          },
+          loadTeamsOptions() {
+            let opts = '<option value="">-- เลือกคณะสีผู้ชนะ --</option>' + db.teams.map(t => `<option value="${t.id}">${t.ชื่อคณะ}</option>`).join('');
+            document.getElementById('res-gold').innerHTML = opts;
+            document.getElementById('res-silver').innerHTML = opts;
+            document.getElementById('res-bronze').innerHTML = opts;
+          }
+        },
+        adminImport: {
+          init() {},
+          getTemplate() {
+            let aoa = [["เลขประจำตัว", "ชื่อ", "นามสกุล", "ชั้นห้อง", "id_คณะสี", "id_กีฬา", "หมายเหตุ"]];
+            let ws = XLSX.utils.aoa_to_sheet(aoa);
+            let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "รายชื่อระบบนักกีฬา");
+            XLSX.writeFile(wb, "Template_Athletes.xlsx");
+          },
+          parseFile() {
+            let files = document.getElementById('excel-uploader').files;
+            if(!files.length) return app.ui.toast("กรุณาเลือกไฟล์ Excel เพื่ออัปโหลดก่อน");
+            let reader = new FileReader();
+            reader.onload = (e) => {
+              let bytes = new Uint8Array(e.target.result);
+              let book = XLSX.read(bytes, { type: 'array' });
+              let rawJson = XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]]);
+              this.payload = rawJson;
+              
+              document.getElementById('import-preview').style.display = 'block';
+              document.querySelector('#table-import-preview tbody').innerHTML = rawJson.slice(0, 5).map(r => `
+                <tr><td>${r['ชื่อ']||''}</td><td>${r['นามสกุล']||''}</td><td>${r['id_คณะสี']||''}</td></tr>
+              `).join('');
+            };
+            reader.readAsArrayBuffer(files[0]);
+          },
+          async upload() {
+            if(!this.payload) return;
+            let res = await app.api.post("importAthletes", this.payload);
+            if(res.success) { app.ui.toast("นำเข้าชุดรายชื่อนักกีฬาลงฐานข้อมูลสำเร็จ"); app.router.navigate('admin'); }
+          }
+        },
+        adminDownload: {
+          init() {},
+          dlMedals() {
+            let ws = XLSX.utils.json_to_sheet(db.medalSummary);
+            let wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "คะแนนสรุป");
+            XLSX.writeFile(wb, "Medal_Report.xlsx");
+          }
+        },
+        adminCertificate: {
+          async init() {
+            let res = await app.api.get("getSchedule");
+            document.getElementById('cert-match-picker').innerHTML = '<option value="">-- เลือกรายงานแมตช์แข่งขัน --</option>' + res.data.map(s => `<option value="${s.id}">รอบรหัส ID: ${s.id}</option>`).join('');
+          },
+          draw(id) {
+            if(!id) return;
+            document.getElementById('cert-printout-wrapper').innerHTML = `
+              <div class="cert-sheet">
+                <div style="font-size:2.2rem; font-weight:700; color:var(--primary)">${CONFIG.SCHOOL_NAME}</div>
+                <div style="margin-top:2rem; font-size:1.4rem;">ขอมอบเกียรติบัตรฉบับนี้ให้ไว้เพื่อแสดงว่าสโมสร / คณะสีผู้ชนะ</div>
+                <div style="font-size:2rem; font-weight:700; text-decoration:underline; margin:1.5rem 0;">ตัวแทนคณะสี ประจำแมตช์การแข่งขันรหัส ${id}</div>
+                <div style="font-size:1.3rem;">ได้เข้าร่วมส่งเสริมและสร้างเกียรติประวัติแห่งชัยชนะในการแข่งขัน</div>
+                <div style="font-size:1.4rem; font-weight:500;">${CONFIG.EVENT_NAME}</div>
+                <div style="width:100%; display:flex; justify-content:space-between; margin-top:3rem; font-size:1.1rem;">
+                  <div>ให้ไว้ ณ วันที่แข่งจัดกิจกรรม ${CONFIG.EVENT_DATE}</div>
+                  <div>ลงชื่อ................................................ (ประธานในพิธี)</div>
+                </div>
+              </div>
+            `;
+          }
+        }
+      }
+    };
+
+    // ปลุกการทำงานเชิงระบบเมื่อตัวแปรเว็บดีไวซ์โหลดองค์ประกอบโครงสร้างเสร็จสิ้น
+    window.addEventListener('DOMContentLoaded', async () => {
+      await app.pages.globalLoad();
+      app.auth.toggleNav();
+      app.router.navigate('home');
+    });
+  </script>
+</body>
+</html>
